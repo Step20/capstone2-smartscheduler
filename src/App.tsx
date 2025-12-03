@@ -34,13 +34,11 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
     return () => unsub();
   }, []);
 
-  // while we are waiting for the auth state, render nothing (or a loader)
-  if (!checked) {
-    return null;
-  }
+  if (!checked) return null;
 
   if (!authed) {
-    return <Navigate to="/not-found" replace />;
+    // not authenticated -> go to signin
+    return <Navigate to="/signin" replace />;
   }
 
   return <>{children}</>;
@@ -48,40 +46,49 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 
 function App() {
   return (
-    <>
-      <Routes>
-        {/* Protected app routes (layout + inner pages) */}
-        <Route
-          path="/"
-          element={
-            <PrivateRoute>
-              <AppPage />
-            </PrivateRoute>
-          }
-        >
-          <Route index element={<DashboardPage />} />
-          <Route path=":uid/dashboard" element={<DashboardPage />} />
-          <Route path=":uid/schedule" element={<SchedulePage />} />
-          <Route path=":uid/people" element={<PeoplePage />} />
-          <Route path=":uid/analytics" element={<AnalyticsPage />} />
-          <Route path=":uid/settings" element={<SettingsPage />} />
-          <Route path=":uid/ai-chat" element={<AIChatPage />} />
-        </Route>
+    <Routes>
+      {/* Root -> go to signin (startup/no uid) */}
+      <Route path="/" element={<Navigate to="/signin" replace />} />
 
-        {/* public auth routes */}
-        <Route path="/signin" element={<SignInPage />} />
-        <Route path="/signup" element={<SignUpPage />} />
+      {/* Public auth routes */}
+      <Route path="/signin" element={<SignInPage />} />
+      <Route path="/signup" element={<SignUpPage />} />
 
-        {/* appointment: require auth in this example */}
-        <Route path=":uid/appointment" element={<AppointmentPage />} />
+      {/* Explicit no-uid tries -> show not-found */}
+      <Route path="/dashboard" element={<Navigate to="/not-found" replace />} />
+      <Route path="/schedule" element={<Navigate to="/not-found" replace />} />
+      <Route path="/people" element={<Navigate to="/not-found" replace />} />
+      <Route path="/analytics" element={<Navigate to="/not-found" replace />} />
+      <Route path="/settings" element={<Navigate to="/not-found" replace />} />
+      <Route path="/ai-chat" element={<Navigate to="/not-found" replace />} />
 
-        {/* explicit not-found page */}
-        <Route path="/not-found" element={<NotFoundPage />} />
+      {/* Protected routes under /:uid */}
+      <Route
+        path="/:uid"
+        element={
+          <PrivateRoute>
+            <AppPage />
+          </PrivateRoute>
+        }
+      >
+        {/* default to dashboard for /:uid */}
+        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route path="dashboard" element={<DashboardPage />} />
+        <Route path="schedule" element={<SchedulePage />} />
+        <Route path="people" element={<PeoplePage />} />
+        <Route path="analytics" element={<AnalyticsPage />} />
+        <Route path="settings" element={<SettingsPage />} />
+        <Route path="ai-chat" element={<AIChatPage />} />
+      </Route>
 
-        {/* catch-all -> redirect to not-found */}
-        <Route path="*" element={<Navigate to="/not-found" replace />} />
-      </Routes>
-    </>
+      <Route path=":uid/appointment" element={<AppointmentPage />} />
+
+      {/* not-found page */}
+      <Route path="/not-found" element={<NotFoundPage />} />
+
+      {/* fallback -> goto signin */}
+      <Route path="*" element={<Navigate to="/signin" replace />} />
+    </Routes>
   );
 }
 

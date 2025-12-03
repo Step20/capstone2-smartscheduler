@@ -165,38 +165,33 @@ export default function DashboardPage() {
 
   // listen for services in Firestore for this user (real-time)
   useEffect(() => {
-    if (!uid) return;
+    if (!uid) {
+      setServices(mockServices);
+      return;
+    }
 
     const q = query(collection(db, "services"), where("ownerId", "==", uid));
+
     const unsub = onSnapshot(
       q,
       (snap) => {
-        const data = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
-        if (data.length) {
-          setServices((prev) => [...data, ...prev]);
-        }
-        console.log("services snapshot data:", data);
+        const firestoreServices = snap.docs.map((d) => ({
+          id: d.id,
+          ...(d.data() as any),
+        }));
+
+        // replace state entirely (not append) with Firestore data + mock
+        setServices((prev) =>
+          [...prev, ...firestoreServices].filter(
+            (svc, index, arr) => index === arr.findIndex((s) => s.id === svc.id)
+          )
+        );
       },
       (err) => {
         console.error("services snapshot error:", err);
+        setServices(mockServices);
       }
     );
-
-    // one-time fetch fallback (in case no real-time docs yet)
-    (async () => {
-      try {
-        const snap = await getDocs(q);
-        if (!snap.empty) {
-          const data = snap.docs.map((d) => ({
-            id: d.id,
-            ...(d.data() as any),
-          }));
-          setServices([...data, ...mockServices]);
-        }
-      } catch (e) {
-        // ignore - we already log in error handler
-      }
-    })();
 
     return () => unsub();
   }, [uid]);
@@ -215,6 +210,7 @@ export default function DashboardPage() {
 
   function addNewService() {
     if (!newServiceName.trim()) return;
+
     const payload = {
       name: newServiceName.trim(),
       count: 0,
@@ -228,22 +224,19 @@ export default function DashboardPage() {
       createdAt: serverTimestamp(),
     };
 
-    // if we have a signed in user, write to Firestore; otherwise add to local list
     (async () => {
       try {
         if (uid) {
-          const ref = await addDoc(collection(db, "services"), payload);
-          // push newly created doc into local state with its generated id
-          setServices((prev) => [{ id: ref.id, ...payload }, ...prev]);
+          // Firestore handles state updates via onSnapshot — DO NOT manually update state
+          await addDoc(collection(db, "services"), payload);
         } else {
-          // fallback: local-only (keeps existing mock behavior)
+          // For local-only mode, manually add
           const id = `s${Date.now()}`;
           setServices((prev) => [{ id, ...payload }, ...prev]);
         }
       } catch (err) {
         console.error("Failed to add service:", err);
       } finally {
-        // reset form + close
         setNewServiceName("");
         setNewServiceDesc("");
         setNewServiceDuration("");
